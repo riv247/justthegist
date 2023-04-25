@@ -1,0 +1,107 @@
+Test JSON Request 1: {
+	"prompt_version": "0.0.1",
+	"params": {
+		"list_format": "ol",
+		"list_size_max": 5,
+		"list_size_min": 2
+	},
+	"optional_instructions": "Please summarize the article on the latest developments in COVID-19 vaccine research.",
+	"text": "Researchers have reported an experimental vaccine against COVID-19 has shown promising results in a small study involving mice. The vaccine, developed by researchers at the University of Pittsburgh School of Medicine, was reportedly effective in producing antibodies against the novel coronavirus. The vaccine, called PittCoVacc and delivered through a fingertip-sized patch, was found to generate enough antibodies capable of neutralizing the virus."
+},
+Summary Response 1: {
+	"prompt_version": "0.0.1",
+	"context": "",
+	"summary": "Researchers from the University of Pittsburgh School of Medicine have found that PittCoVacc, an experimental vaccine against COVID-19, showed promising results in a study with mice. The vaccine generates enough antibodies to neutralize the virus via a fingertip-sized patch.",
+	"tldr": "An experimental COVID-19 vaccine, called PittCoVacc, has been found effective in producing antibodies and neutralizing the virus in a small study involving mice."
+}
+
+Test JSON Request 2: {
+	"prompt_version": "0.0.1",
+	"params": {
+		"list_format": "ul",
+		"list_size_max": 3,
+		"list_size_min": 1
+	},
+	"optional_instructions": "Please summarize the latest developments on the government's response to COVID-19 in the US.",
+	"text": "The US government has implemented a new plan to ramp up testing and contact tracing efforts as a means to contain the spread of COVID-19. The plan prioritizes testing for individuals experiencing symptoms and those who have come into close contact with confirmed cases. However, President Trump has expressed his desire to reopen the country and scale back social distancing measures, despite warnings from public health officials that it may lead to a surge in infections and deaths."
+},
+Summary Response 2: {
+	"prompt_version": "0.0.1",
+	"context": "Conflicting information to be added to the summary.",
+	"summary": "The US government has prioritized testing for COVID-19 in individuals with symptoms and close contact with confirmed cases. Despite this, President Trump has expressed interest in scaling back social distancing measures and reopening the country. Public health officials warn that this could lead to a surge in infections and deaths.",
+	"tldr": "The US government is prioritizing COVID-19 testing for individuals with symptoms and close contact with confirmed cases, but President Trump wants to reopen the country and potentially scale back social distancing measures, despite concerns from public health officials."
+}
+
+--
+
+Test JSON Request 1: {
+	"prompt_version": "0.0.1",
+	"params": {
+		"list_format": "ul",
+		"list_size_max": 5,
+		"list_size_min": 2
+	},
+	"optional_instructions": "Please summarize this article on climate change: https://www.bbc.com/news/science-environment-58609262",
+	"text": "The UN's climate change chief, Patricia Espinosa, has urged countries to deliver stronger climate action targets in their next Nationally Determined Contributions (NDCs). She called on governments to do more ahead of November's crucial COP26 climate summit. Ms Espinosa made her remarks as a new report by European climatologists revealed greenhouse gas emissions are still rising. They showed a 2.2 percent increase of CO2 in the atmosphere in 2021 compared to 2020."
+}
+
+Summary Response 1: {
+	"prompt_version": "0.0.1",
+	"context": "summarized article on climate change",
+	"summary": "- The UN's climate change chief, Patricia Espinosa, has urged countries to deliver stronger climate action targets in their next Nationally Determined Contributions (NDCs).\n- A new report by European climatologists revealed greenhouse gas emissions are still rising.\n- They showed a 2.2 percent increase of CO2 in the atmosphere in 2021 compared to 2020.\n",
+	"tldr": "UN's climate change chief urges stronger climate action targets in next NDCs. Greenhouse gas emissions still rising with a 2.2% increase of CO2 in 2021 compared to 2020."
+}
+
+Test JSON Request 2: {
+	"prompt_version": "0.0.1",
+	"params": {
+		"list_format": "ul",
+		"list_size_max": 5,
+		"list_size_min": 2
+	},
+	"optional_instructions": "Please summarize this article on climate change: https://www.bbc.com/news/science-environment-58609262",
+	"text": "The UN's climate change chief, Patricia Espinosa, has urged countries to deliver stronger climate action targets in their next Nationally Determined Contributions (NDCs). She called on governments to do more ahead of November's crucial COP26 climate summit. However, some critics argue that the COP26 summit will not be productive due to disagreements among countries about the level of action needed to combat climate change. Ms Espinosa made her remarks as a new report by European climatologists revealed greenhouse gas emissions are still rising. They showed a 2.2 percent increase of CO2 in the atmosphere in 2021 compared to 2020."
+}
+
+Summary Response 2: {
+	"prompt_version": "0.0.1",
+	"context": "summarized article on climate change",
+	"summary": "- The UN's climate change chief, Patricia Espinosa, has urged countries to deliver stronger climate action targets in their next Nationally Determined Contributions (NDCs).\n- However, some critics argue the COP26 summit will not be productive due to disagreements among countries about the level of action needed to combat climate change.\n- A new report by European climatologists revealed greenhouse gas emissions are still rising.\n- They showed a 2.2 percent increase of CO2 in the atmosphere in 2021 compared to 2020.\n",
+	"tldr": "UN's climate change chief urges stronger climate action targets in next NDCs. Critics argue COP26 summit will not be productive due to disagreements. Greenhouse gas emissions still rising with a 2.2% increase of CO2 in 2021 compared to 2020."
+}
+
+--
+
+Test JSON Request 1: {
+	"prompt_version": "0.0.1",
+	"params": {
+		"list_format": "ul",
+		"list_size_max": 10,
+		"list_size_min": 1
+	},
+	"optional_instructions": "Please summarize the history of World War II.""text": "World War II was a global war that lasted from 1939 to 1945. It was the deadliest conflict in human history with approximately 50 million fatalities. The war involved the majority of the world's nations, including all of the great powers, eventually forming two opposing military alliances: the Allies and the Axis."
+}
+
+Summary Response 1: {
+	"prompt_version": "0.0.1",
+	"context": "Summarizing the history of World War II.",
+	"summary": "World War II began in 1939 and lasted until 1945, resulting in approximately 50 million fatalities. The war involved most of the world's nations, forming two opposing alliances: the Allies and the Axis.",
+	"tldr": "World War II was a global war resulting in 50 million deaths and involving most of the world's nations."
+}
+
+Test JSON Request 2: {
+	"prompt_version": "0.0.1",
+	"params": {
+		"list_format": "ol",
+		"list_size_max": 5,
+		"list_size_min": 1
+	},
+	"optional_instructions": "Provide a brief overview of the causes of the American Civil War.""text": "There are many causes that led to the outbreak of the American Civil War in 1861. Some of the main causes include economic and social differences between the North and South, the controversial issue of slavery, and states' rights."
+}
+
+Summary Response 2: {
+	"prompt_version": "0.0.1",
+	"context": "Providing an overview of the causes of the American Civil War.",
+	"summary": "The American Civil War began in 1861 due to economic and social differences between the North and South, the controversial issue of slavery, and states' rights.",
+	"tldr": "The American Civil War began due to economic and social differences, slavery, and states' rights."
+}
