@@ -9,14 +9,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"riv247/jtg/model"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/k0kubun/pp"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -27,14 +30,16 @@ func handlePromptRequest(c echo.Context) (err error) {
 type promptParams map[string]interface{}
 
 type promptCommonStruct struct {
-	PromptVersion string `json:"prompt_version,omitempty"`
+	Provider      string `json:"provider,omitempty"`
+	ProviderID    string `json:"provider_id,omitempty"`
+	PromptVersion string `json:"v,omitempty"`
 }
 
 type promptReqStruct struct {
 	promptCommonStruct                // `json:"prompt_common_struct,omitempty"`
-	Params               promptParams `json:"params,omitempty"`
-	OptionalInstructions string       `json:"optional_instructions,omitempty"`
-	Text                 string       `json:"text,omitempty"`
+	Params               promptParams `json:"p,omitempty"`
+	OptionalInstructions string       `json:"oi,omitempty"`
+	Text                 string       `json:"t,omitempty"`
 }
 
 func (promptReq promptReqStruct) JSON() (b []byte, err error) {
@@ -44,8 +49,8 @@ func (promptReq promptReqStruct) JSON() (b []byte, err error) {
 
 type promptResStruct struct {
 	promptCommonStruct        // `json:"prompt_common_struct,omitempty"`
-	Context            string `json:"context,omitempty"`
-	Summary            string `json:"summary,omitempty"`
+	Context            string `json:"c,omitempty"`
+	Summary            string `json:"s,omitempty"`
 	TLDR               string `json:"tldr,omitempty"`
 }
 
@@ -89,7 +94,7 @@ func handleTextRequest(c echo.Context) (err error) {
 	pp.Println(res)
 	pp.Println(res.Choices[0].Message.Content)
 
-	return c.JSON(http.StatusOK, res.Choices[0].Message)
+	return c.JSON(http.StatusOK, res.Choices[0].Message.Content)
 }
 
 func corsForHandleTestRequest(next echo.HandlerFunc) echo.HandlerFunc {
@@ -139,12 +144,21 @@ func handleTestRequest(c echo.Context) (err error) {
 		return
 	}
 
+	// lines := strings.Split(reqPrompt.Text, "\n")
+	// reqPrompt.Text = fmt.Sprintf("[%s]", strings.Join(lines, ", "))
+
+	b, err := json.Marshal(reqPrompt)
+	if err != nil {
+		logger.Printf("Marshal error: %v\n", err)
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
 	// Set the response header
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextPlainCharsetUTF8)
 	c.Response().WriteHeader(http.StatusOK)
 
 	// Create an OpenAI client
-	client := openai.NewClient(os.Getenv("OPEN_AI_API_KEY"))
+	aiClient := openai.NewClient(os.Getenv("OPEN_AI_API_KEY"))
 	ctx := context.Background()
 
 	req := openai.ChatCompletionRequest{
@@ -153,29 +167,24 @@ func handleTestRequest(c echo.Context) (err error) {
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,
-				Content: reqPrompt.Text,
+				Content: masterPromptStr + " " + string(b),
 			},
 		},
 		Stream: true,
 	}
-	stream, err := client.CreateChatCompletionStream(ctx, req)
+	stream, err := aiClient.CreateChatCompletionStream(ctx, req)
 	if err != nil {
 		return err
 	}
 	defer stream.Close()
 
-	tokenCounter := 0
+	pp.Println(req.Messages[0].Content)
 
+	var content string
 	for {
-		response, err := stream.Recv()
+		res, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			// Calculate the estimated cost
-			gpt35TurboCost := estimateCost(tokenCounter, gpt35TurboCostPer1000Tokens)
-
-			// Print the estimated costs
-			pp.Println(fmt.Sprintf("Estimated cost for GPT-3.5-turbo: $%.4f", gpt35TurboCost))
-
-			return nil
+			break
 		}
 
 		if err != nil {
@@ -183,19 +192,57 @@ func handleTestRequest(c echo.Context) (err error) {
 		}
 
 		// Write the partial response to the client
-		partialContent := response.Choices[0].Delta.Content
+		partialContent := res.Choices[0].Delta.Content
 		if _, err := c.Response().Write([]byte(partialContent)); err != nil {
 			return err
 		}
+		content = content + partialContent
 
 		// Flush the response writer
 		if flusher, ok := c.Response().Writer.(http.Flusher); ok {
 			flusher.Flush()
 		}
+	}
 
-		// Count tokens in the partial response
-		partialTokens := countTokens(partialContent)
-		tokenCounter += partialTokens
+	// Count tokens in the partial response
+	tokenCounter := countTokens(content)
+
+	// Calculate the estimated cost
+	gpt35TurboCost := estimateCost(tokenCounter, gpt35TurboCostPer1000Tokens)
+
+	// Print the estimated costs
+	pp.Println(fmt.Sprintf("Estimated cost for GPT-3.5-turbo: $%.4f", gpt35TurboCost))
+
+	pp.Println(content)
+
+	// check content is JSON
+	// if not, return error
+	err = json.Unmarshal([]byte(content), &promptResStruct{})
+	if err != nil {
+		logger.Printf("Unmarshal error: %v\n", err)
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	var summaryModel model.SummaryModel
+	err = json.Unmarshal([]byte(content), &summaryModel)
+	if err != nil {
+		logger.Printf("Unmarshal error: %v\n", err)
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	summaryModel.ProviderID = reqPrompt.ProviderID
+	summaryModel.Provider = reqPrompt.Provider
+	summaryModel.PromptVersion = reqPrompt.PromptVersion
+	summaryModel.CreatedAt = time.Now()
+	summaryModel.UpdatedAt = time.Now()
+
+	pp.Println(summaryModel)
+	// return
+
+	err = summaryModel.Save(dbClient)
+	if err != nil {
+		logger.Printf("Save error: %v\n", err)
+		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
 	return
@@ -203,6 +250,8 @@ func handleTestRequest(c echo.Context) (err error) {
 
 var (
 	masterPromptStr string
+
+	dbClient *dynamodb.Client
 )
 
 func main() {
@@ -237,15 +286,21 @@ var (
 func init() {
 	logger = log.New(os.Stdout, "[JTG] ", log.Ldate|log.Ltime|log.LUTC|log.Lshortfile)
 
-	// os.Setenv("JTG_SERVER_PORT", "8080")
-
 	promptBytes, err := os.ReadFile("./prompt/prompt_small_0-0-1.txt")
 	if err != nil {
-		fmt.Println(err)
+		logger.Printf("ReadFile error: %v\n", err)
 		return
 	}
 
 	fields := strings.Fields(string(promptBytes))
 	masterPromptStr = strings.Join(fields, " ")
 	masterPromptStr = strings.ReplaceAll(masterPromptStr, "--", "")
+
+	dbClient, err = model.NewClient()
+	if err != nil {
+		logger.Printf("NewClient error: %v\n", err)
+		return
+	}
+
+	model.MakeTables(dbClient)
 }

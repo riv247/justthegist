@@ -6,13 +6,27 @@
 		<title>Test Streaming</title>
 		<script>
 				function sendData() {
+						const provider = document.getElementById("input-provider").value;
+						const providerID = document.getElementById("input-provider_id").value;
 						const input = document.getElementById("input-text");
 						const output = document.getElementById("output");
+
+						if (!provider || !providerID) {
+							output.innerHTML = 'Please enter provider name and id';
+							return;
+						}
+
+						if (!input.value) {
+							output.innerHTML = 'Please enter text';
+							return;
+						}
 
 						output.innerHTML = 'Waiting for response...';
 
 						const body = {
-							text: input.value,
+							provider,
+							provider_id: providerID,
+							t: input.value,
 						};
 
 						const requestOptions = {
@@ -23,7 +37,7 @@
 								body: JSON.stringify(body),
 						};
 
-						fetch("http://localhost:3207/test", requestOptions)
+						fetch("http://localhost:9999/test", requestOptions)
 								.then(response => {
 										if (!response.ok) {
 												throw new Error(`HTTP error! status: ${response.status}`);
@@ -39,6 +53,18 @@
 														function push() {
 																reader.read().then(({done, value}) => {
 																		if (done) {
+																				let obj;
+																				try {
+																					obj = JSON.parse(output.innerText.trim());
+																				} catch (e) {
+																					output.innerHTML = 'Error: ' + e.message;
+																					controller.close();
+																					return;
+																				}
+
+																				const prettyOuput = JSON.stringify(obj, null, 2);
+																				output.innerHTML = prettyOuput;
+
 																				controller.close();
 																				return;
 																		}
@@ -61,9 +87,13 @@
 </head>
 <body>
 		<h1>Test Streaming</h1>
+		<p><input id="input-provider" type="text" placeholder="Enter provider name..."></p>
+		<p><input id="input-provider_id" type="text" placeholder="Enter provider id..."></p>
 		<textarea id="input-text" rows="4" cols="50" placeholder="Enter your text here..."></textarea>
 		<br>
 		<button onclick="sendData()">Submit</button>
-		<div id="output" style="margin-top: 20px; white-space: pre-wrap;"></div>
+		<div style="margin-top: 20px; white-space: pre-wrap;">
+			<pre id="output" style="whitespace: pre-wrap;"></pre>
+		</div>
 </body>
 </html>
