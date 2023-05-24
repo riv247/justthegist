@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"riv247/jtg/ai"
 	"riv247/jtg/model"
 	"strings"
 	"time"
@@ -21,41 +22,79 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sashabaranov/go-openai"
 	"golang.org/x/text/unicode/norm"
+
+	"riv247/jtg/provider"
 )
 
 func handlePromptRequest(c echo.Context) (err error) {
-	return c.JSON(http.StatusOK, masterPromptStr)
+	return c.JSON(http.StatusOK, ai.SummarizePrompt)
 }
 
-type promptParams map[string]interface{}
-
-type promptCommonStruct struct {
-	Provider      string `json:"provider,omitempty"`
-	ProviderID    string `json:"provider_id,omitempty"`
-	PromptVersion string `json:"v,omitempty"`
+type promptTokenizeReqStruct struct {
+	Input  string `json:"input,omitempty"`
+	Output string `json:"output,omitempty"`
 }
 
-type promptReqStruct struct {
-	promptCommonStruct                // `json:"prompt_common_struct,omitempty"`
-	Params               promptParams `json:"p,omitempty"`
-	OptionalInstructions string       `json:"oi,omitempty"`
-	Text                 string       `json:"t,omitempty"`
-}
+func handlePromptTokenizeRequest(c echo.Context) (err error) {
+	var req promptTokenizeReqStruct
+	if err = c.Bind(&req); err != nil {
+		logger.Println("ERROR:", err.Error())
+		return
+	}
 
-func (promptReq promptReqStruct) JSON() (b []byte, err error) {
-	b, err = json.Marshal(promptReq)
-	return
-}
+	if req.Input == "" {
+		err = errors.New("input is required")
+		logger.Println("ERROR:", err.Error())
 
-type promptResStruct struct {
-	promptCommonStruct        // `json:"prompt_common_struct,omitempty"`
-	Context            string `json:"c,omitempty"`
-	Summary            string `json:"s,omitempty"`
-	TLDR               string `json:"tldr,omitempty"`
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": ".input is required",
+		})
+	}
+
+	aiClient := ai.NewClient(os.Getenv("OPEN_AI_API_KEY"), openai.GPT3Dot5Turbo)
+	// aiClient.DryRun = true
+
+	promptInput := ai.PromptReqStruct{
+		Text: req.Input,
+	}
+
+	b, err := json.Marshal(promptInput)
+	if err != nil {
+		logger.Println("ERROR:", err.Error())
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
+	}
+	formattedInput := string(b)
+
+	output, err := aiClient.Prompt(ai.SummarizePrompt, formattedInput)
+	if err != nil {
+		logger.Println("ERROR:", err.Error())
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
+	}
+
+	var promptRes ai.PromptResStruct
+	err = json.Unmarshal([]byte(output), &promptRes)
+	if err != nil {
+		logger.Println("ERROR:", err.Error())
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
+	}
+	pp.Println(promptRes)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"output": output,
+	})
 }
 
 func handleTextRequest(c echo.Context) (err error) {
-	reqPrompt := new(promptReqStruct)
+	reqPrompt := new(ai.PromptReqStruct)
 	if err = c.Bind(reqPrompt); err != nil {
 		return
 	}
@@ -139,7 +178,7 @@ func countTokens(s string) int {
 }
 
 func handleTestRequest(c echo.Context) (err error) {
-	reqPrompt := new(promptReqStruct)
+	reqPrompt := new(ai.PromptReqStruct)
 	if err = c.Bind(reqPrompt); err != nil {
 		return
 	}
@@ -167,7 +206,7 @@ func handleTestRequest(c echo.Context) (err error) {
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,
-				Content: masterPromptStr + " " + string(b),
+				Content: ai.SummarizePrompt + " " + string(b),
 			},
 		},
 		Stream: true,
@@ -217,7 +256,7 @@ func handleTestRequest(c echo.Context) (err error) {
 
 	// check content is JSON
 	// if not, return error
-	err = json.Unmarshal([]byte(content), &promptResStruct{})
+	err = json.Unmarshal([]byte(content), &ai.PromptResStruct{})
 	if err != nil {
 		logger.Printf("Unmarshal error: %v\n", err)
 		return c.JSON(http.StatusInternalServerError, err.Error())
@@ -249,19 +288,16 @@ func handleTestRequest(c echo.Context) (err error) {
 }
 
 var (
-	masterPromptStr string
-
 	dbClient *dynamodb.Client
 )
 
 func main() {
 	e := echo.New()
 
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
+	// e.Use(customLogger())
+	// e.Use(middleware.Logger())
+	// e.Use(middleware.Recover())
 
-	// Configure CORS middleware for the /test endpoint
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{echo.POST, echo.OPTIONS},
@@ -272,8 +308,11 @@ func main() {
 
 	// Routes
 	e.GET("/prompt", handlePromptRequest)
-	e.POST("/test", handleTestRequest, corsForHandleTestRequest)
-	e.POST("/text", handleTextRequest)
+	e.POST("/prompt/tokenize", handlePromptTokenizeRequest)
+	// e.POST("/test", handleTestRequest, corsForHandleTestRequest)
+	// e.POST("/text", handleTextRequest)
+
+	e.POST("/slack/shortcut", provider.HandleSlackInteractionRequest)
 
 	// Start server
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", os.Getenv("JTG_SERVER_PORT"))))
@@ -288,18 +327,16 @@ func init() {
 
 	promptBytes, err := os.ReadFile("./prompt/prompt_small_0-0-1.txt")
 	if err != nil {
-		logger.Printf("ReadFile error: %v\n", err)
-		return
+		logger.Fatalln("ERROR:", err.Error())
 	}
 
 	fields := strings.Fields(string(promptBytes))
-	masterPromptStr = strings.Join(fields, " ")
-	masterPromptStr = strings.ReplaceAll(masterPromptStr, "--", "")
+	ai.SummarizePrompt = strings.Join(fields, " ")
+	ai.SummarizePrompt = strings.ReplaceAll(ai.SummarizePrompt, "--", "")
 
-	dbClient, err = model.NewClient()
+	dbClient, err := model.NewClient()
 	if err != nil {
-		logger.Printf("NewClient error: %v\n", err)
-		return
+		logger.Fatalln("ERROR:", err.Error())
 	}
 
 	model.MakeTables(dbClient)

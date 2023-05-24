@@ -90,64 +90,19 @@ func (aiClient *AIClient) Prompt(prompt string, input string) (output string, er
 	_, inputTokenCount := Tokenize(input)
 	inputCost := EsitmateCost(inputTokenCount, aiClient.ModelCostPer1000Tokens)
 
-	sentences, err := TokenizeSentence(input)
+	chunks, chunkTokenCount, err := TokenizeChunks(input, maxTokenCount)
 	if err != nil {
 		logger.Println("ERROR:", err.Error())
 		return
 	}
-	// pp.Println("sentences:", sentences)
-
-	chunks := [][]string{}
-	chunksTotalTokenCount := 0
-
-	chunk := []string{}
-	chunkTokenCount := 0
-	for i, sentence := range sentences {
-		nextChunkTokenCount := chunkTokenCount + sentence.TokenCount
-
-		// adding sentence to chunk will not fit maxTokenCount
-		if nextChunkTokenCount >= maxTokenCount {
-			chunks = append(chunks, chunk)
-			// pp.Println("chunk:", chunk)
-
-			chunksTotalTokenCount += chunkTokenCount
-
-			// reset for next chunk
-			chunk = []string{}
-			chunkTokenCount = 0
-			nextChunkTokenCount = 0 + sentence.TokenCount
-		}
-
-		// sentence is too long to fit in any chunk
-		if chunkTokenCount == 0 && nextChunkTokenCount > maxTokenCount {
-			logger.Println("ERROR: sentence too long:", sentence)
-			continue
-		}
-
-		// adding sentence to chunk will fit maxTokenCount
-		if nextChunkTokenCount <= maxTokenCount {
-			chunk = append(chunk, sentence.Sentence)
-			// pp.Println("chunk:", chunk)
-
-			chunkTokenCount += sentence.TokenCount
-		}
-
-		lastSentence := i == len(sentences)-1
-		if lastSentence {
-			chunks = append(chunks, chunk)
-			// pp.Println("chunk:", chunk)
-
-			chunksTotalTokenCount += chunkTokenCount
-		}
-	}
-	// pp.Println("chunks:", chunks)
-	// pp.Println("chunksTotalTokenCount:", chunksTotalTokenCount, inputTokenCount)
+	// pp.Println(inputTokenCount, chunkTokenCount, chunks)
 
 	logger.Println("ESTIMATED_INPUT_COST:")
 	pp.Println("chunks:", len(chunks))
 	pp.Println("tokens:", inputTokenCount, inputCost)
 	fmt.Println("--")
 
+	// aiClient.DryRun = true
 	if aiClient.DryRun {
 		return
 	}
@@ -157,14 +112,21 @@ func (aiClient *AIClient) Prompt(prompt string, input string) (output string, er
 
 	// TODO: batch requests
 	for i, chunk := range chunks {
-		_, chunkOutput, err := aiClient.prompt(prompt + strings.Join(chunk, ""))
+		sentences := strings.Join(chunk.Sentences, "")
+		chunkInput := prompt + sentences
+		pp.Println("chunk input:", i, chunkInput)
+
+		_, chunkOutput, err := aiClient.prompt(chunkInput)
 		if err != nil {
 			logger.Println("ERROR:", err.Error())
 			return "", err
 		}
-		pp.Println("chunk output:", i, chunkOutput)
 
+		if strings.HasPrefix(chunkOutput, "Output:") {
+			chunkOutput = strings.TrimPrefix(chunkOutput, "Output:")
+		}
 		output += chunkOutput
+		pp.Println("chunk output:", i, chunkOutput)
 
 		_, outputTokenCount := Tokenize(output)
 		outputCost := EsitmateCost(outputTokenCount, aiClient.ModelCostPer1000Tokens)
@@ -177,10 +139,12 @@ func (aiClient *AIClient) Prompt(prompt string, input string) (output string, er
 		outputTotalCost += outputCost
 		outputTotalTokenCount += outputTokenCount
 	}
-	pp.Println("output:", output)
+	if len(chunks) > 1 {
+		pp.Println("output:", output)
+	}
 
 	logger.Println("ESTIMATED_TOTAL_COST:")
-	pp.Println("tokens:", chunksTotalTokenCount+outputTotalTokenCount, outputTotalCost+EsitmateCost(chunksTotalTokenCount, aiClient.ModelCostPer1000Tokens))
+	pp.Println("tokens:", chunkTokenCount+outputTotalTokenCount, outputTotalCost+EsitmateCost(chunkTokenCount, aiClient.ModelCostPer1000Tokens))
 
 	return
 }

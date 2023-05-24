@@ -9,6 +9,66 @@ import (
 	"github.com/jdkato/prose/v2"
 )
 
+type TokenizedChunk struct {
+	Sentences  []string
+	TokenCount int
+}
+
+func TokenizeChunks(text string, maxTokenCount int) (chunks []TokenizedChunk, tokenCount int, err error) {
+	sentences, err := TokenizeSentence(text)
+	if err != nil {
+		logger.Println("ERROR:", err.Error())
+		return
+	}
+	// pp.Println("sentences:", sentences)
+
+	// chunks = []TokenizedChunk{}
+	chunk := TokenizedChunk{}
+	for i, sentence := range sentences {
+		nextChunkTokenCount := chunk.TokenCount + sentence.TokenCount
+
+		// adding sentence to chunk will not fit maxTokenCount
+		if nextChunkTokenCount >= maxTokenCount {
+			chunks = append(chunks, chunk)
+			// pp.Println("chunk:", chunk)
+
+			// reset for next chunk
+			chunk = TokenizedChunk{
+				Sentences:  []string{},
+				TokenCount: 0,
+			}
+			nextChunkTokenCount = 0 + sentence.TokenCount
+		}
+
+		// sentence is too long to fit in any chunk
+		if chunk.TokenCount == 0 && nextChunkTokenCount > maxTokenCount {
+			logger.Println("ERROR: sentence too long:", sentence)
+			continue
+		}
+
+		// adding sentence to chunk will fit maxTokenCount
+		if nextChunkTokenCount <= maxTokenCount {
+			chunk.Sentences = append(chunk.Sentences, sentence.Sentence)
+			chunk.TokenCount += sentence.TokenCount
+			// pp.Println("chunk:", chunk)
+		}
+
+		lastSentence := i == len(sentences)-1
+		if lastSentence {
+			chunks = append(chunks, chunk)
+			// pp.Println("chunk:", chunk)
+		}
+	}
+	// pp.Println("chunks:", chunks)
+	// pp.Println("chunksTotalTokenCount:", chunksTotalTokenCount, inputTokenCount)
+
+	for _, chunk := range chunks {
+		tokenCount += chunk.TokenCount
+	}
+
+	return
+}
+
 type TokenizedSentence struct {
 	Sentence   string
 	TokenCount int
