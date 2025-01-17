@@ -18,12 +18,13 @@ import (
 	"github.com/slack-go/slack"
 )
 
+// demo users for building messages to test summarization
 var userTokens = map[string]string{
-	"user1": "xoxp-5181488852848-5295729665955-5308805435601-e71ca369383a6aa5a3eceda615007a3e",
-	"user2": "xoxp-5181488852848-5308494529889-5281640381415-3ae370acb70d7230795464c99b0b4d46",
-	"user3": "xoxp-5181488852848-5308494795425-5281643963159-41c77bb0cba955b424125251e96a49fa",
-	"user4": "xoxp-5181488852848-5289256363590-5308822401985-91bca4157b776de043ce8678b1c24d6d",
-	"user5": "xoxp-5181488852848-5319565115376-5293243902405-7bf737f3f358f35a4902d77aa495e13c",
+	"user1": os.Getenv("USER_1_SLACK_TOKEN"),
+	"user2": os.Getenv("USER_2_SLACK_TOKEN"),
+	"user3": os.Getenv("USER_3_SLACK_TOKEN"),
+	"user4": os.Getenv("USER_4_SLACK_TOKEN"),
+	"user5": os.Getenv("USER_5_SLACK_TOKEN"),
 }
 
 type mockMessagesModalView struct {
